@@ -1,0 +1,5 @@
+[
+  {"productId": "mock-1", "title": "Base Líquida Oil Control", "variantId": "mock-v1", "amount": 8990, "currency": "BRL"},
+  {"productId": "mock-2", "title": "Base Matte Longa Duração", "variantId": "mock-v2", "amount": 11990, "currency": "BRL"},
+  {"productId": "mock-3", "title": "Batom Cremoso Rosa", "variantId": "mock-v3", "amount": 4990, "currency": "BRL"}
+]

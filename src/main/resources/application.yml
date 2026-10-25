@@ -1,0 +1,11 @@
+spring:
+  config:
+    import: optional:file:./application-local.yml
+  ai:
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:none}
+
+ucp:
+  # URL raw pública do agent-profile.json (gist). Vazio = catálogo mocado.
+  agent-profile-url: https://cdn.jsdelivr.net/gh/renanpadilha/ucp-agent-profile@ce9c90052b0524bc17941063f3fa238521d74cd8/agent-profile.json
+  mcp-endpoint: https://totvs-sp-boca-rosa.myshopify.com/api/ucp/mcp

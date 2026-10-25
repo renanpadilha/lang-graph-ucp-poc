@@ -1,0 +1,14 @@
+# segredos locais
+application-local.yml
+.env*
+
+# build
+target/
+node_modules/
+dist/
+
+# ide
+.idea/
+.vscode/
+.DS_Store
+!.env.example

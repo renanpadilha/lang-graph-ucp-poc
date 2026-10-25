@@ -1,0 +1,53 @@
+name: CD (homologação OCI)
+
+# Só roda manualmente ou ao criar uma tag v*, e só se DEPLOY_ENABLED=true
+# (Settings > Secrets and variables > Actions > Variables). Veja README.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+concurrency: deploy-hml
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - run: ./mvnw -B -DskipTests package
+
+      # jar é independente de arquitetura; o qemu só monta a camada arm64 da imagem
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build da imagem (arm64)
+        run: docker buildx build --platform linux/arm64 -t ucp-agent-api:latest --load .
+
+      - name: Configurar SSH
+        env:
+          SSH_KEY: ${{ secrets.OCI_SSH_KEY }}
+          HOST: ${{ secrets.OCI_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+
+      - name: Enviar imagem e arquivos de deploy
+        env:
+          TARGET: ${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}
+        run: |
+          docker save ucp-agent-api:latest | gzip | ssh -i ~/.ssh/id_deploy "$TARGET" 'gunzip | docker load'
+          rsync -az -e "ssh -i ~/.ssh/id_deploy" deploy/ "$TARGET":/opt/app/deploy/
+
+      - name: Subir
+        env:
+          TARGET: ${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "$TARGET" \
+            'cd /opt/app/deploy && docker compose --env-file ../.env -f docker-compose.hml.yml up -d --remove-orphans && docker image prune -f'

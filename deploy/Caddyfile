@@ -1,0 +1,20 @@
+{
+	# staging do Let's Encrypt nos primeiros testes: ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory
+	acme_ca {$ACME_CA}
+}
+
+{$APP_DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy backend:8080 {
+			flush_interval -1   # SSE / AG-UI em tempo real
+		}
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}
