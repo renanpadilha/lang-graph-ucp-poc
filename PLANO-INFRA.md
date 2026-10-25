@@ -203,34 +203,39 @@ origem.
 
 Perfis Spring: padrão (local) e `hml`.
 
-## 5. Deploy
+## 5. CI/CD (GitHub Actions) e deploy
 
-### 5.1 Backend
+Repositórios privados: `renanpadilha/lang-graph-ucp-poc` (backend) e
+`renanpadilha/lang-graph-frontend-poc` (frontend). **Já criados, CI verde nos dois.**
 
-1. `Dockerfile` multi-stage: Maven + JDK 25 no build, JRE 25 na imagem final, **arm64** (a VM é
-   Ampere). Build na própria VM (`docker compose build`) evita cross-build.
-2. `spring-boot-starter-actuator` expõe `/actuator/health` para o healthcheck.
-3. Logs: `docker compose logs -f backend`.
+### 5.1 CI (automático)
 
-### 5.2 Frontend
+Push na `main` e PR: backend roda `./mvnw -DskipTests package`; frontend roda
+`npm ci && npm run build` (pula enquanto não existe `package.json`). Sem testes (POC).
 
-1. Na sua máquina: `npm run build` gera `dist/`.
-2. Enviar: `rsync -az --delete dist/ ubuntu@<IP>:/opt/app/web/`.
-3. O Caddy já serve `/srv/web`; sem reiniciar nada.
+### 5.2 CD (manual ou tag `v*`; desligado por padrão)
+
+Só executa se a variable `DEPLOY_ENABLED=true`. Evita falha enquanto a VM não existe.
+
+- **Backend:** compila o jar, monta a imagem **arm64** (jar sem dependência de arquitetura;
+  qemu só monta a camada), envia com `docker save | ssh ... docker load` (sem registry),
+  copia `deploy/` para `/opt/app/deploy` e roda `docker compose up -d`.
+- **Frontend:** `npm run build` e `rsync dist/` para `/opt/app/web`. O Caddy já serve essa pasta.
+
+Secrets em ambos os repositórios: `OCI_HOST`, `OCI_USER`, `OCI_SSH_KEY` (chave **só de deploy**).
+Passo a passo no README de cada repo. O `/opt/app/.env` da VM nasce de `deploy/.env.example`
+e nunca passa pelo Git.
 
 ### 5.3 Rotina de atualização
 
 ```
-backend:  ssh VM → git pull → docker compose -f deploy/docker-compose.hml.yml up -d --build
-frontend: npm run build → rsync dist/ para /opt/app/web/
-conferir: curl https://<dns>/actuator/health   (o Caddy só expõe /api; ver nota abaixo)
+código → push na main → CI valida
+quando quiser publicar: git tag v0.1.0 && git push --tags   (ou "Run workflow")
+rollback: rodar o CD de uma tag anterior
 ```
 
-> Nota: o health do actuator fica fora de `/api`; para conferir, usar `docker compose ps`
-> (healthcheck do contêiner) ou mapear o actuator em `/api/health`. Decido na implementação.
-
-Rollback: `git checkout <tag-anterior>` e `up -d --build` de novo; no front, manter a pasta
-`dist` anterior como `web.prev`. Sem pipeline na POC.
+Observação: o app ainda **não lê** `APP_CHECKPOINTER`/perfil `hml` (passo 1 e 2 da §7). Até
+lá o deploy sobe, mas o estado continua em memória.
 
 ### 5.4 Checklist de promoção (local → homologação)
 
@@ -258,7 +263,7 @@ Rollback: `git checkout <tag-anterior>` e `up -d --build` de novo; no front, man
 1. Perfis Spring + `app.checkpointer`; `memory` continua padrão.
 2. Adicionar `postgres-saver`; testar local com Postgres em contêiner: pausar, reiniciar o
    back, aprovar.
-3. `Dockerfile` do back; `deploy/` (compose + Caddyfile).
+3. ~~`Dockerfile` do back; `deploy/`; CI/CD~~ — **feito** (falta só validar na VM).
 4. **Você:** criar a VM e preparar (3.2 e 3.3), escolher o DNS (3.4) e me passar IP/DNS (3.7).
 5. Primeiro deploy com o certificado *staging*; depois o de produção.
 6. Rodar o checklist 5.4.
