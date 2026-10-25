@@ -5,6 +5,7 @@ import org.bsc.langgraph4j.CompileConfig;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.bsc.langgraph4j.GraphStateException;
 import org.bsc.langgraph4j.StateGraph;
+import org.bsc.langgraph4j.agui.sdk.AGUIHook;
 import org.bsc.langgraph4j.checkpoint.MemorySaver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +26,7 @@ public class OrderGraphConfig {
                                                 OrderNode order, FulfillmentNode fulfillment,
                                                 ErrorHandlerNode errorHandler) throws GraphStateException {
         return new StateGraph<>(OrderState.SCHEMA, OrderState::new)
+                .addWrapCallNodeHook(AGUIHook.<OrderState>stepEvents())
                 .addNode("discovery", node_async(discovery))
                 .addNode("select", node_async(select))
                 .addNode("checkout", node_async(checkout))

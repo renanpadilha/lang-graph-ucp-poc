@@ -214,14 +214,14 @@ O front é outro projeto (`~/projects/ucp-agent-web`). O que este backend precis
 
 | Item | Detalhe |
 |---|---|
-| Endpoint **AG-UI** | `langgraph4j-ag-ui-springboot` (`AGUISSEController`): eventos `STEP_*`, `STATE_*`, `TEXT_*`, `TOOL_CALL_*`, `RUN_*` |
+| Endpoint **AG-UI** (feito: `POST /sse/order`) | `langgraph4j-ag-ui-springboot` (`AGUISSEController`): eventos `STEP_*`, `STATE_*`, `TEXT_*`, `TOOL_CALL_*`, `RUN_*` |
 | Eventos `CUSTOM` | chamadas UCP (tool, ms, ok), chamadas LLM (resumo, ms, `fallback`), decisão das edges |
 | `GET /api/graph` | topologia: nós (`llm`/`deterministic`), arestas com rótulo e se são condicionais, `interruptBefore` |
 | `threadId` no estado | para os nodes emitirem eventos na thread certa (nodes rodam em threads do `CompletableFuture`) |
 | Checkpointer Postgres | `langgraph4j-postgres-saver`, por perfil (ver PLANO-INFRA) |
 | Prefixo `/api` | os endpoints atuais `/orders` continuam para `curl` |
 
-**Primeiro passo é um spike:** grafo mínimo + `AGUISSEController`, para confirmar que os eventos
+**Spike feito e aprovado** (ver `ucp-agent-web/PLANO.md` §3.3). Código em `agui/OrderAgent` e `agui/AguiConfig`. Antes era: grafo mínimo + `AGUISSEController`, para confirmar que os eventos
 `STEP_*`/`STATE_*` chegam e que a pausa do `interruptBefore` aparece. Plano B no
 `PLANO.md` do front (§3.3).
 
