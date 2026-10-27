@@ -44,10 +44,11 @@ jobs:
         run: |
           docker save ucp-agent-api:latest | gzip | ssh -i ~/.ssh/id_deploy "$TARGET" 'gunzip | docker load'
           rsync -az -e "ssh -i ~/.ssh/id_deploy" deploy/ "$TARGET":/opt/app/deploy/
+          rsync -az -e "ssh -i ~/.ssh/id_deploy" compose.yaml "$TARGET":/opt/app/compose.yaml
 
       - name: Subir
         env:
           TARGET: ${{ secrets.OCI_USER }}@${{ secrets.OCI_HOST }}
         run: |
           ssh -i ~/.ssh/id_deploy "$TARGET" \
-            'cd /opt/app/deploy && docker compose --env-file ../.env -f docker-compose.hml.yml up -d --remove-orphans && docker image prune -f'
+            'cd /opt/app/deploy && docker compose --env-file ../.env -f ../compose.yaml -f docker-compose.hml.yml up -d --remove-orphans && docker image prune -f'

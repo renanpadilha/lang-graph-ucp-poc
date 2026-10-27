@@ -11,13 +11,20 @@ import java.util.Map;
 
 public class OrderState extends AgentState {
 
+    private static final tools.jackson.databind.ObjectMapper MAPPER = tools.jackson.databind.json.JsonMapper.builder().build();
+
     public static final String USER_QUERY = "userQuery";
     public static final String SEARCH_FILTER = "searchFilter";
     public static final String CANDIDATES = "candidates";
-    public static final String SELECTED_VARIANT_ID = "selectedVariantId";
-    public static final String CART_ID = "cartId";
-    public static final String CHECKOUT_ID = "checkoutId";
-    public static final String SHIPPING_OPTION = "shippingOption";
+    /** Variantes que o cliente marcou nos cards (preenchido pelo front ao retomar a pausa antes de select). */
+    public static final String SELECTED_VARIANT_IDS = "selectedVariantIds";
+    /** Quantidade por variantId (padrão 1). */
+    public static final String SELECTED_QUANTITIES = "selectedQuantities";
+    /** Um carrinho/checkout por loja: storeId -> id. */
+    public static final String CARTS = "carts";
+    public static final String CHECKOUTS = "checkouts";
+    /** Frete escolhido por loja: storeId -> optionId. */
+    public static final String SHIPPING_OPTIONS = "shippingOptions";
     public static final String STATUS = "status";
     public static final String ERROR = "error";
     public static final String RETRIES = "retries";
@@ -34,15 +41,33 @@ public class OrderState extends AgentState {
 
     public SearchFilter searchFilter() { return this.<SearchFilter>value(SEARCH_FILTER).orElse(null); }
 
-    public List<Product> candidates() { return this.<List<Product>>value(CANDIDATES).orElse(List.of()); }
+    /** Vindo do checkpoint (Postgres), os itens chegam como Map: converte de volta para Product. */
+    public List<Product> candidates() {
+        return this.<List<Object>>value(CANDIDATES).orElse(List.of()).stream()
+                .map(o -> o instanceof Product p ? p : MAPPER.convertValue(o, Product.class))
+                .toList();
+    }
 
-    public String selectedVariantId() { return this.<String>value(SELECTED_VARIANT_ID).orElse(null); }
+    public List<String> selectedVariantIds() { return this.<List<String>>value(SELECTED_VARIANT_IDS).orElse(List.of()); }
 
-    public String cartId() { return this.<String>value(CART_ID).orElse(null); }
+    /** Produtos dos candidatos que o cliente marcou, na ordem em que foram encontrados. */
+    public List<Product> selectedProducts() {
+        List<String> ids = selectedVariantIds();
+        return candidates().stream().filter(p -> ids.contains(p.variantId())).distinct().toList();
+    }
 
-    public String checkoutId() { return this.<String>value(CHECKOUT_ID).orElse(null); }
+    public int quantityOf(String variantId) {
+        Object q = this.<Map<String, Object>>value(SELECTED_QUANTITIES).orElse(Map.of()).get(variantId);
+        return q instanceof Number n ? Math.max(1, n.intValue()) : 1;
+    }
 
-    public String shippingOption() { return this.<String>value(SHIPPING_OPTION).orElse(null); }
+    public Map<String, String> carts() { return this.<Map<String, String>>value(CARTS).orElse(Map.of()); }
+
+    public Map<String, String> checkouts() { return this.<Map<String, String>>value(CHECKOUTS).orElse(Map.of()); }
+
+    public Map<String, String> shippingOptions() {
+        return this.<Map<String, String>>value(SHIPPING_OPTIONS).orElse(Map.of());
+    }
 
     public OrderStatus status() { return this.<OrderStatus>value(STATUS).orElse(OrderStatus.NEW); }
 

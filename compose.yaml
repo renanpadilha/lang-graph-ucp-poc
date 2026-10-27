@@ -1,0 +1,23 @@
+# Postgres do checkpointer: o MESMO serviço em local e homologação.
+#   local:  docker compose up -d postgres
+#   hml:    docker compose -f compose.yaml -f deploy/docker-compose.hml.yml up -d   (ver deploy/)
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: langgraph
+      POSTGRES_USER: lg_app
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-lg_app_local}
+    ports:
+      - "127.0.0.1:5432:5432"   # só loopback; o override de hml remove isto
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lg_app -d langgraph"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata: {}

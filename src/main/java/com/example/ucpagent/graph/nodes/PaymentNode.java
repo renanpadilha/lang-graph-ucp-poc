@@ -20,7 +20,7 @@ public class PaymentNode implements NodeAction<OrderState> {
 
     @Override
     public Map<String, Object> apply(OrderState state) {
-        log.info("payment SIMULADO: checkout={} variant={}", state.checkoutId(), state.selectedVariantId());
+        log.info("payment SIMULADO: checkouts={} variants={}", state.checkouts(), state.selectedVariantIds());
         return Map.of(OrderState.STATUS, OrderStatus.PAYMENT_SIMULATED);
     }
 }

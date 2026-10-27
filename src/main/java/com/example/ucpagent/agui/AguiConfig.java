@@ -18,7 +18,7 @@ public class AguiConfig {
 
     /** POST /sse/{agentId} (rota fixa do langgraph4j). */
     @Bean
-    public AGUISSEController aguiController(AGUIAgentRegistry registry) {
+    public AGUISSEController aguiSseController(AGUIAgentRegistry registry) {
         return new AGUISSEController(registry, new AGUIJacksonSerializer());
     }
 }

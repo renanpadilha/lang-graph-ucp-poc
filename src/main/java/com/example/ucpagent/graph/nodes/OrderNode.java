@@ -17,7 +17,7 @@ public class OrderNode implements NodeAction<OrderState> {
 
     @Override
     public Map<String, Object> apply(OrderState state) {
-        log.info("order SIMULADO para checkout={}", state.checkoutId());
+        log.info("order SIMULADO para checkouts={}", state.checkouts());
         return Map.of(OrderState.STATUS, OrderStatus.ORDER_PLACED);
     }
 }

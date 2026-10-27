@@ -1,11 +1,24 @@
 spring:
   config:
     import: optional:file:./application-local.yml
+  # Mesmo Postgres em todos os ambientes (local = compose.yaml; hml = deploy/docker-compose.hml.yml).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/langgraph}
+    username: ${SPRING_DATASOURCE_USERNAME:lg_app}
+    password: ${SPRING_DATASOURCE_PASSWORD:lg_app_local}
   ai:
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:none}
 
 ucp:
   # URL raw pública do agent-profile.json (gist). Vazio = catálogo mocado.
+  # Perfil é do AGENTE (capacidades), não da loja — a mesma URL serve pra todas as lojas abaixo.
   agent-profile-url: https://cdn.jsdelivr.net/gh/renanpadilha/ucp-agent-profile@ce9c90052b0524bc17941063f3fa238521d74cd8/agent-profile.json
-  mcp-endpoint: https://totvs-sp-boca-rosa.myshopify.com/api/ucp/mcp
+  # Backend consulta todas as lojas em paralelo (fan-out em DiscoveryNode). Loja sem mcp-endpoint é ignorada.
+  stores:
+    - id: boca-rosa
+      name: "Boca Rosa"
+      mcp-endpoint: https://totvs-sp-boca-rosa.myshopify.com/api/ucp/mcp
+    - id: sallve
+      name: "Sallve"
+      mcp-endpoint: ${SALLVE_MCP_ENDPOINT:https://www.sallve.com.br/api/ucp/mcp}

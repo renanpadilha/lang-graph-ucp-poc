@@ -1,5 +1,6 @@
 package com.example.ucpagent.ucp;
 
+import com.example.ucpagent.trace.CallRecorder;
 import com.example.ucpagent.ucp.UcpModels.Product;
 import com.example.ucpagent.ucp.UcpModels.ShippingOption;
 import tools.jackson.databind.JsonNode;
@@ -8,9 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 
@@ -22,8 +21,8 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * JSON-RPC 2.0 sobre MCP. Só leitura + create_cart + create_checkout.
  * complete_checkout NÃO existe aqui de propósito.
+ * Uma instância por loja (ver {@link StoreRegistry}) — não é bean singleton.
  */
-@Component
 public class UcpMcpClient {
 
     private static final Logger log = LoggerFactory.getLogger(UcpMcpClient.class);
@@ -31,14 +30,23 @@ public class UcpMcpClient {
     private final ObjectMapper mapper = JsonMapper.builder().build();
     private final RestClient http = RestClient.create();
     private final AtomicLong rpcId = new AtomicLong();
+    private final String storeId;
+    private final String storeName;
     private final String endpoint;
     private final String profileUrl;
+    private final CallRecorder recorder;
 
-    public UcpMcpClient(@Value("${ucp.mcp-endpoint}") String endpoint,
-                        @Value("${ucp.agent-profile-url:}") String profileUrl) {
+    public UcpMcpClient(String storeId, String storeName, String endpoint, String profileUrl, CallRecorder recorder) {
+        this.storeId = storeId;
+        this.storeName = storeName;
         this.endpoint = endpoint;
         this.profileUrl = profileUrl;
+        this.recorder = recorder;
     }
+
+    public String storeId() { return storeId; }
+
+    public String storeName() { return storeName; }
 
     public boolean isMock() {
         return profileUrl == null || profileUrl.isBlank();
@@ -52,38 +60,56 @@ public class UcpMcpClient {
             for (JsonNode v : p.path("variants")) {
                 if (!v.path("availability").path("available").asBoolean(false)) continue;
                 out.add(new Product(
+                        storeId,
+                        storeName,
                         p.path("id").asText(),
                         p.path("title").asText() + " - " + v.path("title").asText(),
                         v.path("id").asText(),
                         v.path("price").path("amount").asLong(),
-                        v.path("price").path("currency").asText("BRL")));
+                        v.path("price").path("currency").asText("BRL"),
+                        firstImage(v.path("media"), p.path("media")),
+                        p.path("url").asText(null)));
                 break; // 1 variante por produto basta pro POC
             }
         }
         return out;
     }
 
-    public String createCart(String variantId) {
+    public String createCart(Map<String, Integer> variantQty) {
         if (isMock()) return "mock-cart";
-        JsonNode res = call("create_cart", Map.of("cart", Map.of(
-                "line_items", List.of(Map.of("quantity", 1, "item", Map.of("id", variantId))))));
+        JsonNode res = call("create_cart", Map.of("cart", Map.of("line_items", lineItems(variantQty))));
         return res.path("id").asText();
     }
 
-    public String createCheckout(String variantId) {
+    public String createCheckout(Map<String, Integer> variantQty) {
         if (isMock()) return "mock-checkout";
-        JsonNode res = call("create_checkout", Map.of("checkout", Map.of(
-                "line_items", List.of(Map.of("quantity", 1, "item", Map.of("id", variantId))))));
+        JsonNode res = call("create_checkout", Map.of("checkout", Map.of("line_items", lineItems(variantQty))));
         return res.path("id").asText();
     }
 
-    public List<ShippingOption> shippingOptions(String checkoutId, String variantId) {
+    private static List<Map<String, Object>> lineItems(Map<String, Integer> variantQty) {
+        return variantQty.entrySet().stream()
+                .<Map<String, Object>>map(e -> Map.of("quantity", e.getValue(), "item", Map.of("id", e.getKey())))
+                .toList();
+    }
+
+    public List<ShippingOption> shippingOptions(String checkoutId, List<String> variantIds) {
         if (isMock()) {
             return List.of(new ShippingOption("mock-std", "Padrão 5-8 dias", 1990, "BRL"),
                     new ShippingOption("mock-exp", "Expresso 1-2 dias", 3990, "BRL"));
         }
         JsonNode current = call("get_checkout", Map.of("id", checkoutId));
-        String lineId = current.path("line_items").path(0).path("id").asText();
+        // Todas as linhas do checkout entram na atualização e no método de entrega.
+        List<Map<String, Object>> lines = new ArrayList<>();
+        List<String> lineIds = new ArrayList<>();
+        int i = 0;
+        for (JsonNode line : current.path("line_items")) {
+            String lineId = line.path("id").asText();
+            String itemId = line.path("item").path("id").asText(i < variantIds.size() ? variantIds.get(i) : "");
+            lines.add(Map.of("id", lineId, "quantity", line.path("quantity").asInt(1), "item", Map.of("id", itemId)));
+            lineIds.add(lineId);
+            i++;
+        }
         // Dados FICTÍCIOS: o Shopify só calcula frete com contato + endereço.
         Map<String, Object> destination = Map.of(
                 "id", "dest-1", "first_name", "Teste", "last_name", "POC",
@@ -91,17 +117,17 @@ public class UcpMcpClient {
                 "street_address", "Avenida Paulista, 1000", "extended_address", "Apto 1", "address_locality", "São Paulo",
                 "address_region", "SP", "postal_code", "01310-100", "address_country", "BR");
         JsonNode res = call("update_checkout", Map.of("id", checkoutId, "checkout", Map.of(
-                "line_items", List.of(Map.of("id", lineId, "quantity", 1, "item", Map.of("id", variantId))),
+                "line_items", lines,
                 "buyer", Map.of("email", "teste@example.com", "phone_number", "+5511999999999"),
                 "fulfillment", Map.of("methods", List.of(Map.of(
                         "type", "shipping",
-                        "line_item_ids", List.of(lineId),
+                        "line_item_ids", lineIds,
                         "destinations", List.of(destination),
                         "selected_destination_id", "dest-1"))))));
         // Shopify calcula frete de forma assíncrona: re-lê o checkout até aparecerem opções.
         JsonNode checkout = res;
         List<ShippingOption> out = parseShipping(checkout);
-        for (int i = 0; i < 6 && out.isEmpty(); i++) {
+        for (int n = 0; n < 6 && out.isEmpty(); n++) {
             try {
                 Thread.sleep(1500);
             } catch (InterruptedException e) {
@@ -112,6 +138,15 @@ public class UcpMcpClient {
             out = parseShipping(checkout);
         }
         return out;
+    }
+
+    private static String firstImage(JsonNode... medias) {
+        for (JsonNode media : medias) {
+            for (JsonNode m : media) {
+                if ("image".equals(m.path("type").asText()) && m.hasNonNull("url")) return m.get("url").asText();
+            }
+        }
+        return null;
     }
 
     private List<ShippingOption> parseShipping(JsonNode checkout) {
@@ -135,8 +170,12 @@ public class UcpMcpClient {
             List<Product> all = mapper.readValue(new ClassPathResource("ucp-products.json").getInputStream(),
                     new TypeReference<>() {});
             String q = query.toLowerCase();
-            return all.stream().filter(p -> q.contains("base") ? p.title().toLowerCase().contains("base")
-                    : p.title().toLowerCase().contains(q)).toList();
+            return all.stream()
+                    .filter(p -> q.contains("base") ? p.title().toLowerCase().contains("base")
+                            : p.title().toLowerCase().contains(q))
+                    .map(p -> new Product(storeId, storeName, p.productId(), p.title(), p.variantId(),
+                            p.amount(), p.currency(), p.image(), p.url()))
+                    .toList();
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -152,11 +191,13 @@ public class UcpMcpClient {
                 "method", "tools/call",
                 "params", Map.of("name", tool, "arguments", arguments));
 
+        long started = System.nanoTime();
         JsonNode resp = http.post().uri(endpoint)
                 .header("Content-Type", "application/json")
                 .body(body)
                 .retrieve()
                 .body(JsonNode.class);
+        recorder.ucp(storeId, tool, (System.nanoTime() - started) / 1_000_000, resp.has("error"), arguments);
 
         log.info("UCP {} -> {}", tool, resp);
         if (resp.has("error")) {

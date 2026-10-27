@@ -12,7 +12,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>ucp-agent</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.1.0</version>
 
     <properties>
         <java.version>25</java.version>
@@ -55,6 +55,15 @@
         <dependency>
             <groupId>org.bsc.langgraph4j</groupId>
             <artifactId>langgraph4j-spring-ai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bsc.langgraph4j</groupId>
+            <artifactId>langgraph4j-postgres-saver</artifactId>
+            <version>${langgraph4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.bsc.langgraph4j</groupId>

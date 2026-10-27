@@ -5,8 +5,9 @@ import java.io.Serializable;
 public final class UcpModels {
     private UcpModels() {}
 
-    /** amount em unidade menor da moeda (2500 BRL = R$ 25,00). */
-    public record Product(String productId, String title, String variantId, long amount, String currency)
+    /** amount em unidade menor da moeda (2500 BRL = R$ 25,00). storeId identifica de qual loja veio. */
+    public record Product(String storeId, String storeName, String productId, String title, String variantId,
+                          long amount, String currency, String image, String url)
             implements Serializable {}
 
     public record SearchFilter(String query, Long maxAmount) implements Serializable {}

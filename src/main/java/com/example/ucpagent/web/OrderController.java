@@ -46,9 +46,9 @@ public class OrderController {
         out.put("status", s.status());
         out.put("nextNode", next);
         out.put("candidates", s.candidates());
-        out.put("selectedVariantId", s.selectedVariantId());
-        out.put("checkoutId", s.checkoutId());
-        out.put("shippingOption", s.shippingOption());
+        out.put("selectedVariantIds", s.selectedVariantIds());
+        out.put("checkouts", s.checkouts());
+        out.put("shippingOptions", s.shippingOptions());
         out.put("error", s.error());
         return out;
     }

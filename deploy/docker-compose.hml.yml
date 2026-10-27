@@ -1,25 +1,17 @@
-# Rodar em /opt/app/deploy:
-#   docker compose --env-file ../.env -f docker-compose.hml.yml up -d
+# Override de homologação. Rodar em /opt/app/deploy:
+#   docker compose --env-file ../.env -f ../compose.yaml -f docker-compose.hml.yml up -d
+# O serviço postgres vem de compose.yaml (igual ao local); aqui só mudam porta e volume.
 services:
   postgres:
-    image: postgres:17
-    environment:
-      POSTGRES_DB: langgraph
-      POSTGRES_USER: lg_app
-      POSTGRES_PASSWORD: ${PG_PASSWORD}
-    volumes:
+    ports: !reset []              # sem porta publicada: só a rede do compose enxerga
+    volumes: !override
       - /opt/app/pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lg_app -d langgraph"]
-      interval: 10s
-    restart: unless-stopped   # sem "ports": só a rede interna enxerga
 
   backend:
     image: ucp-agent-api:latest
-    pull_policy: never        # a imagem chega via `docker load` no deploy
+    pull_policy: never            # a imagem chega via `docker load` no deploy
     env_file: ../.env
     environment:
-      SPRING_PROFILES_ACTIVE: hml
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/langgraph
       SPRING_DATASOURCE_USERNAME: lg_app
       SPRING_DATASOURCE_PASSWORD: ${PG_PASSWORD}
