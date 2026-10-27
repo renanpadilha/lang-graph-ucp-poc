@@ -5,6 +5,8 @@ kind: Ingress
 metadata:
   name: backend
   namespace: apps
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: apps-basic-auth@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
